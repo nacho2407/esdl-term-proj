@@ -27,8 +27,5 @@ int main(void)
 
     while (1)
     {
-        char chr[1024];
-        sprintf(chr, "%d", _millis);
-        USART1_SendString(chr);
     }
 }

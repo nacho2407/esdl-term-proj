@@ -9,7 +9,7 @@ char *Protocol_BuildTriggerMessage(uint32_t seq, uint32_t ambient)
 
     // 메시지 타입, seq, ambient, distance
     snprintf(buffer, sizeof(buffer),
-             "TYPE=%u;SEQ=%lu;AMB=%lu",
+             "TYPE=%u;SEQ=%lu;AMB=%lu\r\n",
              TYPE_TRIGGER, seq, ambient);
 
     return buffer;

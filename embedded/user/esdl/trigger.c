@@ -46,9 +46,9 @@ void EXTI0_IRQHandler(void)
     if (EXTI_GetITStatus(EXTI_Line0) != RESET)
     {
         // 1000ms 이내에 눌리면 무시
-        if (now - last_press > 1000)
+        if (now - last_press > 500)
         {
-            Motor_Run(2000);
+            Motor_Run(200);
             last_press = now;
 
             uint32_t ambient = ReadAmbient();
