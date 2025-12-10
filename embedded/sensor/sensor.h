@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#define ADC_BUF_LEN             256
-#define AMBIENT_AVG_SAMPLES     8
+#define ADC_BUF_LEN 256
+#define AMBIENT_AVG_SAMPLES 8
 
 void Sensor_ADC_Init(void);
 

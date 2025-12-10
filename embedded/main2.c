@@ -2,13 +2,13 @@
   Project: Retro Duck Hunt System Firmware (Final)
   Target : STM32F103RB (Cortex-M3)
  
-  ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
-  1) ADC + DMA + TIM2(2kHz Æ®ï¿½ï¿½ï¿½ï¿½)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ (Circular Buffer)
-  2) Æ®ï¿½ï¿½ï¿½ï¿½(PC4) ï¿½ï¿½ TRIG,seq,ambient ï¿½ï¿½ï¿½ï¿½ + ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
-  3) PC ACK(ï¿½ï¿½ï¿½ï¿½ seq) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ 120ms ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½
-  4) DMA ï¿½ï¿½ï¿½Û¿ï¿½ï¿½ï¿½ 120ms ï¿½ï¿½ï¿½ï¿½(min ADC = peak) ï¿½Ğ¼ï¿½ ï¿½ï¿½ hit ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ RESULT ï¿½ï¿½ï¿½ï¿½
-  5) PC STATUS ï¿½Ş½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½
-  6) ï¿½ï¿½ï¿½Â¸Ó½ï¿½: IDLE (ï¿½ï¿½ï¿½) / WAIT_ACK (ï¿½ß»ï¿½ ï¿½ï¿½È£ ï¿½ï¿½ï¿½ï¿½) / SAMPLING (È­ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)
+   
+  1) ADC + DMA + TIM2(2kHz ?)  ø (Circular Buffer)
+  2) ?(PC4)  TRIG,seq,ambient  +  
+  3) PC ACK( seq)   120ms  ø 
+  4) DMA ? 120ms (min ADC = peak) ?  hit   RESULT 
+  5) PC STATUS ?  ?
+  6) ¸?: IDLE () / WAIT_ACK (? ? ) / SAMPLING (? ÷  )
  */
 
 #include "stm32f10x.h"
@@ -28,54 +28,54 @@
    Config & Constants
    ========================================================================== */
 
-  // DMAï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ( ï¿½ï¿½ï¿½ï¿½ 256ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
-#define ADC_BUF_LEN             256                   //512ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½Ç±ï¿½ ï¿½ï¿½
+  // DMA      (  256 )
+#define ADC_BUF_LEN             256                   //512 ÷ ? 
 
-// PC ï¿½Ã¸ï¿½ï¿½ï¿½ RX ï¿½ï¿½ï¿½ï¿½
+// PC ø RX 
 #define RX_BUF_SIZE             128
 
-// ADC ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½Ä¼ï¿½ (TIM2ï¿½ï¿½ 2kHz Æ®ï¿½ï¿½ï¿½ï¿½)    -> TIM2ï¿½ï¿½ 2kHz ï¿½ï¿½ï¿½Ã¸ï¿½ (0.5ms ï¿½ï¿½ï¿½ï¿½) ï¿½Ñ´Ù°ï¿½ ï¿½ï¿½ï¿½ï¿½
+// ADC ø ? (TIM2 2kHz ?)    -> TIM2 2kHz ø (0.5ms ) ?? 
 #define ADC_SAMPLE_RATE_HZ      2000
 
-// ACK ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ms)
+// ACK  ø  (ms)
 #define SAMPLE_WINDOW_MS        120
 
-// 120ms ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (2kHz * 0.12s ï¿½ï¿½ 240)
+// 120ms    (2kHz * 0.12s  240)
 #define SAMPLE_WINDOW_SAMPLES   ((ADC_SAMPLE_RATE_HZ * SAMPLE_WINDOW_MS) / 1000)
 
-// ambient ï¿½ï¿½Õ¿ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+// ambient ?   
 #define AMBIENT_AVG_SAMPLES     8
 
-// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ó°è°ª (peak(ADC ï¿½ï¿½)ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ hit=1)
-#define HIT_THRESHOLD           1000                             // Æ©ï¿½ï¿½ï¿½Ï±ï¿½!!!!!! (ï¿½ï¿½Î¿ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Å­)
+//   ?? (peak(ADC )    hit=1)
+#define HIT_THRESHOLD           1000                             // ??!!!!!! (?  ?)
 
 
 
 typedef enum {
-    SHOT_IDLE = 0,     // ï¿½Æ¹ï¿½ ï¿½Íµï¿½ ï¿½ï¿½ ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½
-    SHOT_WAIT_ACK,     // TRIG ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ PCï¿½ï¿½ï¿½ï¿½ ACK ï¿½ï¿½Ù¸ï¿½ï¿½ï¿½ ï¿½ï¿½
-    SHOT_SAMPLING      // ACK ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ 120ms ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½
+    SHOT_IDLE = 0,     // ? ?  ? 
+    SHOT_WAIT_ACK,     // TRIG   PC ACK ? 
+    SHOT_SAMPLING      // ACK   120ms ø 
 } ShotState;
 
 volatile uint32_t msTicks = 0;                  // SysTick millis
-volatile uint16_t adc_buf[ADC_BUF_LEN];         // ADC ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ DMA circular ï¿½ï¿½ï¿½ï¿½
+volatile uint16_t adc_buf[ADC_BUF_LEN];         // ADC  ? DMA circular 
 
-volatile uint32_t sequence_num = 0;        // ï¿½ï¿½Ã¼ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-volatile uint32_t current_shot_seq = 0;        // ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È£  >> TRIG/ACK/RESULT ï¿½ï¿½ï¿½ ï¿½Ì°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ 
+volatile uint32_t sequence_num = 0;        // ü  
+volatile uint32_t current_shot_seq = 0;        //  ó   ?  >> TRIG/ACK/RESULT  ?   
 
-volatile uint8_t  flag_trigger = 0;        // Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ß»ï¿½ (ISR ï¿½ï¿½ main)  , EXTI ï¿½ï¿½ï¿½Í·ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ 1ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½. mainï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
-volatile uint8_t  flag_ack_matched = 0;        // ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ACK ï¿½ï¿½ï¿½ï¿½, ACK ï¿½ï¿½ï¿½ï¿½, seqï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ 1ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ 
-volatile uint8_t  flag_pc_msg_ready = 0;        // USART1 ISRï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ï·ï¿½Ç¸ï¿½ 1
-volatile ShotState shot_state = SHOT_IDLE;     // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+volatile uint8_t  flag_trigger = 0;        // ? ? (ISR  main)  , EXTI ?? 1 . main ? ó
+volatile uint8_t  flag_ack_matched = 0;        // ?   ACK , ACK , seq   1  
+volatile uint8_t  flag_pc_msg_ready = 0;        // USART1 ISR    ?? 1
+volatile ShotState shot_state = SHOT_IDLE;     //   
 
-// ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½
-uint32_t sampling_start_time = 0;              // ACK ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ miilis(). 120ms ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
-uint16_t sampling_start_index = 0;              // ACK ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ DMA write index   -> ï¿½ï¿½ ï¿½Îµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 240 ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Äµ
-uint16_t min_peak_value = 4095;           // ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¼ï¿½ ADC (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)
+// ø 
+uint32_t sampling_start_time = 0;              // ACK   miilis(). 120ms  
+uint16_t sampling_start_index = 0;              // ACK   DMA write index   ->  ? 240  ?
+uint16_t min_peak_value = 4095;           // ø  ? ADC (  )
 
-// PC RX ï¿½ï¿½ï¿½ï¿½
-char usart1_rx_buf[RX_BUF_SIZE];     //PCï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½Îµï¿½ï¿½ï¿½
-volatile uint8_t usart1_rx_idx = 0;    // ISRï¿½ï¿½ï¿½ï¿½ ï¿½Ñ±ï¿½ï¿½Ú¾ï¿½ ï¿½ï¿½Ù°ï¿½ \n ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½ ï¿½Ï¼ï¿½.
+// PC RX 
+char usart1_rx_buf[RX_BUF_SIZE];     //PC  ? ? /?
+volatile uint8_t usart1_rx_idx = 0;    // ISR ?? ? \n  ? ?.
 
 
 
@@ -110,36 +110,36 @@ int main(void)
     while (1)
     {
 
-        if (flag_trigger && shot_state == SHOT_IDLE)   //IDLE ï¿½ï¿½ï¿½ï¿½ï¿½Ï¶ï¿½ï¿½ï¿½
+        if (flag_trigger && shot_state == SHOT_IDLE)   //IDLE ?
         {
             flag_trigger = 0;
 
             sequence_num++;
             current_shot_seq = sequence_num;
-            shot_state = SHOT_WAIT_ACK;      //ACKï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+            shot_state = SHOT_WAIT_ACK;      //ACK 
 
-            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Âªï¿½ï¿½ ON
-            Motor_Control(1);     //PA1 ï¿½ï¿½ HIGH
+            //   ª ON
+            Motor_Control(1);     //PA1  HIGH
             Delay(50);
-            Motor_Control(0);     //ï¿½ï¿½ï¿½ï¿½ off
+            Motor_Control(0);     // off
 
-            // DMA ï¿½ï¿½ï¿½Û¿ï¿½ï¿½ï¿½ ï¿½Ö½ï¿½ ï¿½ï¿½ï¿½ï¿½ 8ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ ambient ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+            // DMA ? ?  8   ambient  
             uint16_t ambient = ADC_GetAmbientAverage();   
 
             // TRIG,seq=...,ambient=...
             sprintf(tx_buf, "TRIG,seq=%lu,ambient=%u\r\n",
                 (unsigned long)current_shot_seq, ambient);
-            USART_SendString(USART1, tx_buf);   //PCï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+            USART_SendString(USART1, tx_buf);   //PC 
         }
 
-        // PC ï¿½Ş½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ (ACK, STATUS)
+        // PC ? ó (ACK, STATUS)
         if (flag_pc_msg_ready)
         {
             flag_pc_msg_ready = 0;
             Process_PC_Message(usart1_rx_buf);
         }
 
-        // ACK ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½
+        // ACK   ø 
         if (flag_ack_matched && shot_state == SHOT_WAIT_ACK)
         {
             flag_ack_matched = 0;
@@ -149,32 +149,32 @@ int main(void)
             min_peak_value = 4095;
         }
 
-         // ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ peak ï¿½ï¿½ï¿½ & RESULT ï¿½ï¿½ï¿½ï¿½
+         // ø    peak  & RESULT 
 
         if (shot_state == SHOT_SAMPLING)
         {
-            if ((millis() - sampling_start_time) >= SAMPLE_WINDOW_MS) // 120ms ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+            if ((millis() - sampling_start_time) >= SAMPLE_WINDOW_MS) // 120ms  ø    
             {
                 uint16_t samples = SAMPLE_WINDOW_SAMPLES;
                 if (samples > ADC_BUF_LEN) samples = ADC_BUF_LEN;
 
                 min_peak_value = 4095;
 
-                for (uint16_t i = 0; i < samples; i++)        // DMA ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Äµ
+                for (uint16_t i = 0; i < samples; i++)        // DMA   ?
                 {
-                    uint16_t idx = (sampling_start_index + i) % ADC_BUF_LEN; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Îµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
-                    uint16_t v = adc_buf[idx];   // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ğ°ï¿½
-                    if (v < min_peak_value)      // ï¿½Ö¼Ò°ï¿½ ï¿½ï¿½ï¿½ï¿½
+                    uint16_t idx = (sampling_start_index + i) % ADC_BUF_LEN; //   ? 
+                    uint16_t v = adc_buf[idx];   //    ?
+                    if (v < min_peak_value)      // ?? 
                         min_peak_value = v;     
                 }
 
                 int is_hit = (min_peak_value < HIT_THRESHOLD) ? 1 : 0; 
 
-                sprintf(tx_buf, "RESULT,seq=%lu,peak=%u,hit=%d\r\n",             //RESULT ï¿½Ş½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ & ï¿½ï¿½ï¿½ï¿½
+                sprintf(tx_buf, "RESULT,seq=%lu,peak=%u,hit=%d\r\n",             //RESULT ?  & 
                     (unsigned long)current_shot_seq, min_peak_value, is_hit);
                 USART_SendString(USART1, tx_buf);
 
-                shot_state = SHOT_IDLE;    // ï¿½Ù½ï¿½ IDLE ï¿½ï¿½ï¿½Â·ï¿½ ï¿½ï¿½ï¿½ï¿½ -> ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½
+                shot_state = SHOT_IDLE;    // ? IDLE ·  ->   
             }
         }
     }
@@ -189,10 +189,10 @@ void System_Init_All(void)
     GPIO_Configure();
     USART1_Init();      // PC
     USART2_Init();      // Bluetooth
-    TIM2_Config();      // ADC Æ®ï¿½ï¿½ï¿½Å¿ï¿½ 2kHz Å¸ï¿½Ì¸ï¿½
-    ADC_DMA_Config();   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ADC+DMA
-    EXTI_Configure();   // Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ°
-    NVIC_Configure();   // ï¿½ï¿½ï¿½Í·ï¿½Æ® ï¿½ì¼±ï¿½ï¿½ï¿½ï¿½
+    TIM2_Config();      // ADC ?? 2kHz Ÿ?
+    ADC_DMA_Config();   //  ADC+DMA
+    EXTI_Configure();   // ? ?
+    NVIC_Configure();   // ?? ?
 }
 
 void RCC_Configure(void)
@@ -206,7 +206,7 @@ void RCC_Configure(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2 | RCC_APB1Periph_TIM2,
         ENABLE);
 
-    // ADC Å¬ï¿½ï¿½= PCLK2(72MHz)/6 = 12MHz ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½   >> F1 ADC ï¿½Ö´ï¿½ Å¬ï¿½ï¿½ (14MHz) ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ß±ï¿½ ï¿½ï¿½ï¿½Ø¼ï¿½
+    // ADC ?= PCLK2(72MHz)/6 = 12MHz     >> F1 ADC ? ? (14MHz) ? ? ?
     RCC_ADCCLKConfig(RCC_PCLK2_Div6);
 }
 
@@ -214,17 +214,17 @@ void GPIO_Configure(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
 
-    // PA0: ADC ï¿½Ô·ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+    // PA0: ADC ? ( )
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-    // PC4: Æ®ï¿½ï¿½ï¿½ï¿½ (Ç®ï¿½ï¿½ ï¿½Ô·ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ LOWï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+    // PC4: ? (? ?,   LOW )
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-    // PA1: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½)
+    // PA1:   ()
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
@@ -240,7 +240,7 @@ void GPIO_Configure(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-    // USART2: PD5(TX), PD6(RX) ï¿½ï¿½ï¿½ï¿½
+    // USART2: PD5(TX), PD6(RX) 
     GPIO_PinRemapConfig(GPIO_Remap_USART2, ENABLE);
 
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5; // TX
@@ -265,10 +265,10 @@ void TIM2_Config(void)
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
-    // CH2 PWM (ADC Æ®ï¿½ï¿½ï¿½Å¿ï¿½)
+    // CH2 PWM (ADC ??)
     TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
     TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse = 500;  // ï¿½ï¿½Æ¼ 50%
+    TIM_OCInitStructure.TIM_Pulse = 500;  // ? 50%
     TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
     TIM_OC2Init(TIM2, &TIM_OCInitStructure);
 
@@ -280,7 +280,7 @@ void ADC_DMA_Config(void)
     ADC_InitTypeDef ADC_InitStructure;
     DMA_InitTypeDef DMA_InitStructure;
 
-    // DMA1 Channel1: ADC1 ï¿½ï¿½ adc_buf[]
+    // DMA1 Channel1: ADC1  adc_buf[]
     DMA_DeInit(DMA1_Channel1);
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;
     DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)adc_buf;
@@ -296,10 +296,10 @@ void ADC_DMA_Config(void)
     DMA_Init(DMA1_Channel1, &DMA_InitStructure);
     DMA_Cmd(DMA1_Channel1, ENABLE);
 
-    // ADC1 ï¿½ï¿½ï¿½ï¿½: TIM2 CC2 Æ®ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¯ OFF
+    // ADC1 : TIM2 CC2 ?,  ? OFF
     ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;
     ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-    ADC_InitStructure.ADC_ContinuousConvMode = DISABLE; // ï¿½ß¿ï¿½
+    ADC_InitStructure.ADC_ContinuousConvMode = DISABLE; // ?
     ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_CC2;
     ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
     ADC_InitStructure.ADC_NbrOfChannel = 1;
@@ -315,7 +315,7 @@ void ADC_DMA_Config(void)
     ADC_StartCalibration(ADC1);
     while (ADC_GetCalibrationStatus(ADC1));
 
-    // ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ TIM2 CC2ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¯ ï¿½ï¿½ï¿½ï¿½
+    // ? ?  TIM2 CC2  ? 
 }
 
 void USART1_Init(void)
@@ -357,7 +357,7 @@ void EXTI_Configure(void)
 
     EXTI_InitStructure.EXTI_Line = EXTI_Line4;
     EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling; // È¸ï¿½Î¿ï¿½ ï¿½Â°ï¿½ ï¿½ï¿½ï¿½ï¿½
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling; // ?? ° 
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
 }
@@ -384,7 +384,7 @@ void NVIC_Configure(void)
 
  // ISRs
 
- // PC(USART1) RX: ï¿½ï¿½ ï¿½ï¿½ ï¿½Ï¼ï¿½ï¿½Ç¸ï¿½ flagï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+ // PC(USART1) RX:   ?? flag 
 void USART1_IRQHandler(void)
 {
     if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
@@ -405,7 +405,7 @@ void USART1_IRQHandler(void)
     }
 }
 
-// Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ°(PC4)
+// ? ?(PC4)
 void EXTI4_IRQHandler(void)
 {
     if (EXTI_GetITStatus(EXTI_Line4) != RESET)
@@ -441,7 +441,7 @@ void Process_PC_Message(char* msg)
     // STATUS,score=...,time=...
     else if (strncmp(msg, "STATUS", 6) == 0)
     {
-        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½×´ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        //  ? 
         USART_SendString(USART2, msg);
         if (msg[strlen(msg) - 1] != '\n')
             USART_SendString(USART2, "\r\n");
@@ -471,7 +471,7 @@ void SysTick_Init(void)
 {
     if (SysTick_Config(SystemCoreClock / 1000))
     {
-        while (1); // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+        while (1); //   
     }
 }
 
@@ -491,8 +491,8 @@ void Delay(uint32_t ms)
     while ((millis() - start) < ms);
 }
 
-/* DMA ï¿½ï¿½ï¿½ï¿½ write index ï¿½ï¿½ï¿½
- * CNDTR = ï¿½ï¿½ï¿½ï¿½ Ä«ï¿½ï¿½Æ® ï¿½ï¿½ (ï¿½ï¿½ - ï¿½ï¿½ï¿½ï¿½) = ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+/* DMA  write index 
+ * CNDTR =  ??  ( - ) =  
  */
 static inline uint16_t ADC_GetWriteIndex(void)
 {
@@ -503,7 +503,7 @@ static inline uint16_t ADC_GetWriteIndex(void)
     return written;
 }
 
-/* ambient = ï¿½Ö½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ú¿ï¿½ï¿½ï¿½ Nï¿½ï¿½ ï¿½ï¿½ï¿½ */
+/* ambient = ?   ? N  */
 uint16_t ADC_GetAmbientAverage(void)
 {
     uint32_t sum = 0;
@@ -525,7 +525,7 @@ uint16_t ADC_GetAmbientAverage(void)
     return (uint16_t)(sum / count);
 }
 
-/* "...,seq=23,..." ï¿½ï¿½ï¿½ï¿½ 23 ï¿½Ä½ï¿½ */
+/* "...,seq=23,..."  23 ? */
 int Parse_Seq_From_Message(const char* msg)
 {
     const char* p = strstr(msg, "seq=");
