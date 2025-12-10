@@ -36,5 +36,5 @@
 
 ### 실행화면
 
-![App Screenshot](app.png)
+![App Screenshot](../img/app.png)
 
