@@ -3,7 +3,6 @@
 #include "stm32f10x_dma.h"
 #include "stm32f10x_tim.h"
 #include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h"
 #include "sensor.h"
 
 volatile uint16_t adc_buf[ADC_BUF_LEN];
@@ -62,7 +61,7 @@ void Sensor_ADC_Init(void)
 
     // [중요] 채널 변경: ADC_Channel_0 (PA0) -> ADC_Channel_10 (PC0)
     ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 1, ADC_SampleTime_7Cycles5);
-
+    ADC_ExternalTrigConvCmd(ADC1, ENABLE);
     /* --- TIM2 설정 (2kHz 트리거 발생기) --- */
     Sensor_TIM2_Init();
 
