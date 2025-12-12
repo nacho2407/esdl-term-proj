@@ -32,10 +32,11 @@ static int IsHit(uint16_t peakValue) {
     return (peakValue < HIT_THRESHOLD) ? 1 : 0;
 }
 
-// 내부 함수: UART 한 글자 읽기 (Non-blocking)
+// game.c 내부의 함수 교체
 static int UART_ReadChar(uint8_t* c) {
-    if (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET) {
-        *c = USART_ReceiveData(USART1);
+    // 이제 하드웨어 레지스터가 아니라, uart.c가 채워준 버퍼를 확인합니다.
+    if (UART1_Available()) {
+        *c = UART1_Read();
         return 1;
     }
     return 0;

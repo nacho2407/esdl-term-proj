@@ -116,13 +116,27 @@ static inline void USART_SendByte_NoWaitTC(USART_TypeDef *USARTx, uint16_t data)
     USART_SendData(USARTx, (data & 0xFF));
 }
 
+
+
+// 여기 다 수정함
 void USART1_IRQHandler(void)
 {
     if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
     {
         uint8_t byte = (uint8_t)USART_ReceiveData(USART1);
-        USART_SendByte_NoWaitTC(USART2, byte); // PC → Bluetooth 포워딩
-        USART_SendByte_NoWaitTC(USART1, byte); // PC 에코 출력
+
+        // 1. 블루투스로 포워딩 (기존 기능)
+        USART_SendByte_NoWaitTC(USART2, byte);
+
+        // 2. PC로 에코 (기존 기능 - 필요없으면 주석 처리해도 됨)
+        USART_SendByte_NoWaitTC(USART1, byte);
+
+        // 3. [추가] 게임 로직을 위해 버퍼에 저장
+        uint16_t next_head = (rx1_head + 1) % UART_BUF_SIZE;
+        if (next_head != rx1_tail) {
+            rx1_buf[rx1_head] = byte;
+            rx1_head = next_head;
+        }
     }
 }
 
@@ -132,4 +146,19 @@ void USART2_IRQHandler(void)
     {
         USART_ReceiveData(USART2); // 읽어서 플래그만 클리어
     }
+}
+
+// === [추가] 게임 로직용 함수 ===
+int UART1_Available(void)
+{
+    return (rx1_head != rx1_tail);
+}
+
+uint8_t UART1_Read(void)
+{
+    if (rx1_head == rx1_tail) return 0;
+
+    uint8_t byte = rx1_buf[rx1_tail];
+    rx1_tail = (rx1_tail + 1) % UART_BUF_SIZE;
+    return byte;
 }
