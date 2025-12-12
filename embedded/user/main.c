@@ -19,7 +19,9 @@ void Init(void)
     Sensor_ADC_Init();
     Motor_Init();
     Trigger_Init();
+    NVIC_Configure();
     USART1_Init();
+    USART2_init();
 }
 
 int main(void)
