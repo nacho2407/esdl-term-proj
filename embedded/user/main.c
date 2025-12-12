@@ -4,6 +4,7 @@
 #include "esdl/sensor.h"
 #include "esdl/uart.h"
 #include "esdl/time.h"
+#include "esdl/game.h"     //추가
 #include "string.h"
 #include "stdio.h"
 
@@ -12,7 +13,7 @@ void Init(void);
 void Init(void)
 {
     SystemInit();
-
+     
     // SysTick 1ms 설정 → millis() 사용 가능
     SysTick_Config(SystemCoreClock / 1000);
     Sensor_ADC_Init();
@@ -27,5 +28,6 @@ int main(void)
 
     while (1)
     {
+        Game_Loop();      //추가
     }
 }
