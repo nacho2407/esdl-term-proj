@@ -9,7 +9,7 @@
 
 // === 설정값 ===
 #define FLASH_DURATION_MS   120   // PC 화면 플래시 지속 시간
-#define HIT_THRESHOLD       200   // 이 값보다 ADC가 낮으면 명중으로 판정 >>> 나중에 튜닝하기!!!!
+#define HIT_THRESHOLD       200   // 이 값보다 ADC가 낮으면 명중으로 판정
 
 // === 상태 머신 ===
 typedef enum {
@@ -19,33 +19,25 @@ typedef enum {
 
 static GameState currentState = STATE_IDLE;
 static uint32_t triggerTime = 0;
-extern volatile uint32_t seq; // protocol.c에 있는 변수 사용
+extern volatile uint32_t seq; // protocol.c (또는 외부) 변수
 
-// UART 수신 버퍼 (Polling 방식용)
+// UART 수신 버퍼
 #define RX_BUF_SIZE 64
 static char rxBuffer[RX_BUF_SIZE];
 static uint8_t rxIndex = 0;
 
+// 초기화 여부 플래그
+static int isGameInitialized = 0;
+
 // 내부 함수: 명중 여부 판별
 static int IsHit(uint16_t peakValue) {
-    // ADC 값은 밝을수록 낮아짐 -> 임계값보다 낮으면 명중
     return (peakValue < HIT_THRESHOLD) ? 1 : 0;
-}
-
-// 내부 함수: UART 한 글자 읽기 (Non-blocking)
-static int UART_ReadChar(uint8_t* c) {
-    if (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET) {
-        *c = USART_ReceiveData(USART1);
-        return 1;
-    }
-    return 0;
 }
 
 // 내부 함수: 수신된 문자열 처리
 static void ProcessReceivedData(void) {
-    // "ACK" 문자열이 포함되어 있는지 확인
     if (strstr(rxBuffer, "ACK") != NULL) {
-        // ACK를 받으면 즉시 타이머 시작
+        // ACK 수신 시 타이머 시작
         triggerTime = millis();
         currentState = STATE_WAIT_FLASH;
 
@@ -56,45 +48,56 @@ static void ProcessReceivedData(void) {
 }
 
 void Game_Loop(void) {
-    // 1. UART 데이터 수신 처리 (Polling)
-    uint8_t ch;
-    if (UART_ReadChar(&ch)) {
-        if (rxIndex < RX_BUF_SIZE - 1) {
-            rxBuffer[rxIndex++] = ch;
-            rxBuffer[rxIndex] = '\0';
+    // [중요] 1. 초기화: uart.c가 켜놓은 인터럽트를 강제로 끈다.
+    // 인터럽트가 켜져 있으면 uart.c의 핸들러가 데이터를 가져가버려서
+    // 여기서 아무리 기다려도 데이터를 받을 수 없음.
+    if (!isGameInitialized) {
+        USART_ITConfig(USART1, USART_IT_RXNE, DISABLE);
+        isGameInitialized = 1;
+    }
 
-            // 개행문자나 ACK 패턴 확인
+    // 2. UART 폴링 처리 (인터럽트가 꺼졌으므로 직접 레지스터를 확인해야 함)
+    if (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET) {
+        // 데이터 읽기
+        uint8_t ch = (uint8_t)USART_ReceiveData(USART1);
+
+        // [기능 복구] 인터럽트 핸들러가 하던 일(Bridge & Echo)을 여기서 대신 수행
+        // 1) Bluetooth(USART2)로 포워딩
+        while (USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
+        USART_SendData(USART2, ch);
+
+        // 2) PC(USART1)로 에코 (필요 시)
+        while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+        USART_SendData(USART1, ch);
+
+        // 3) 게임 로직을 위한 버퍼링
+        if (rxIndex < RX_BUF_SIZE - 1) {
+            rxBuffer[rxIndex++] = (char)ch;
+            rxBuffer[rxIndex] = '\0';
             ProcessReceivedData();
         }
         else {
-            // 버퍼 오버플로우 방지 (초기화)
+            // 버퍼 오버플로우 방지
             rxIndex = 0;
             rxBuffer[0] = '\0';
         }
     }
 
-    // 2. 상태 머신 처리
+    // 3. 게임 상태 머신 처리
     switch (currentState) {
     case STATE_IDLE:
         break;
 
     case STATE_WAIT_FLASH:
-        // ACK 수신 후 120ms가 지났는지 확인
+        // ACK 수신 후 120ms 대기
         if (millis() - triggerTime >= FLASH_DURATION_MS) {
 
-            // 120ms 동안의 가장 밝았던 값(최소값) 계산
-            // 현재 write index를 기준으로 120ms 전 데이터부터 탐색
-            // 샘플링 속도(2kHz) -> 1ms당 2개 -> 120ms = 240개 샘플
+            // 120ms 전부터 현재까지(약 240샘플) 중 최솟값(가장 밝은 값) 탐색
             uint16_t len = 240;
             uint16_t currentIdx = ADC_GetWriteIndex();
-
-            // 원형 버퍼 역계산 (현재 위치에서 len만큼 뒤로 이동)
             uint16_t startIdx = (currentIdx + ADC_BUF_LEN - len) % ADC_BUF_LEN;
 
-            // 과거 시점부터 240개 데이터를 훑어서 제일 밝은 값(최소값) 가져오기
             uint16_t peak = ReadPeak(startIdx, len);
-
-            // 명중 판별
             int hit = IsHit(peak);
 
             char resultMsg[64];
