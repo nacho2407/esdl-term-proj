@@ -59,6 +59,9 @@ void USART2_init(void)
     gpio.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_Init(GPIOA, &gpio);
 
+    // USART2 리맵
+    GPIO_PinRemapConfig(GPIO_Remap_USART2, ENABLE);
+
     USART_InitTypeDef usart;
     usart.USART_BaudRate = 9600;
     usart.USART_WordLength = USART_WordLength_8b;
