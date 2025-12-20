@@ -5,7 +5,6 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -13,22 +12,39 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
 import com.example.esdl_term_project.ui.theme.Esdl_term_projectTheme
+import com.example.esdl_term_project.ui.theme.NeonAmber
+import com.example.esdl_term_project.ui.theme.NeonCyan
+import com.example.esdl_term_project.ui.theme.NeonMagenta
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -58,25 +74,90 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Esdl_term_projectTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    val connectionState by bluetoothManagerWrapper.connectionState.collectAsState()
-                    val gameStatus by bluetoothManagerWrapper.gameStatus.collectAsState()
-                    val scope = rememberCoroutineScope()
+                // Cyberpunk / Retro Grid Background
+                val infiniteTransition = rememberInfiniteTransition(label = "grid_anim")
+                val offset by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 100f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "grid_offset"
+                )
 
-                    GameScreen(
-                        connectionState = connectionState,
-                        gameStatus = gameStatus,
-                        onConnect = { device ->
-                            scope.launch { bluetoothManagerWrapper.connect(device) }
-                        },
-                        onDisconnect = { bluetoothManagerWrapper.disconnect() },
-                        onSendMessage = { message ->
-                             scope.launch { bluetoothManagerWrapper.sendMessage(message) }
-                        },
-                        modifier = Modifier.padding(innerPadding),
-                        onCheckPermissions = { checkPermissions() },
-                        bluetoothAdapter = adapter
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF050510)) // Deep dark blue/black
+                ) {
+                    // Moving Grid Effect (Simulated)
+                    Canvas(modifier = Modifier.fillMaxSize().alpha(0.2f)) {
+                        val gridSize = 50.dp.toPx()
+                        val height = size.height
+                        val width = size.width
+                        
+                        // Vertical lines
+                        for (i in 0..((width/gridSize).toInt())) {
+                            drawLine(
+                                color = NeonCyan,
+                                start = androidx.compose.ui.geometry.Offset(i * gridSize, 0f),
+                                end = androidx.compose.ui.geometry.Offset(i * gridSize, height),
+                                strokeWidth = 1f
+                            )
+                        }
+                        
+                        // Horizontal lines (moving)
+                        val startY = offset % gridSize
+                        for (i in 0..((height/gridSize).toInt() + 1)) {
+                            val y = startY + (i * gridSize) - gridSize
+                            drawLine(
+                                color = NeonMagenta,
+                                start = androidx.compose.ui.geometry.Offset(0f, y),
+                                end = androidx.compose.ui.geometry.Offset(width, y),
+                                strokeWidth = 1f
+                            )
+                        }
+                    }
+                    
+                    // Vignette
+                    Box(
+                         modifier = Modifier
+                             .fillMaxSize()
+                             .background(
+                                 Brush.radialGradient(
+                                     colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
+                                     radius = 1200f
+                                 )
+                             )
                     )
+
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = Color.Transparent
+                    ) { innerPadding ->
+                        Box(modifier = Modifier.padding(innerPadding)) {
+                            val connectionState by bluetoothManagerWrapper.connectionState.collectAsState()
+                            val gameStatus by bluetoothManagerWrapper.gameStatus.collectAsState()
+                            val messageLogs by bluetoothManagerWrapper.messageLog.collectAsState()
+                            val scope = rememberCoroutineScope()
+    
+                            GameScreen(
+                                connectionState = connectionState,
+                                gameStatus = gameStatus,
+                                onConnect = { device ->
+                                    scope.launch { bluetoothManagerWrapper.connect(device) }
+                                },
+                                onDisconnect = { bluetoothManagerWrapper.disconnect() },
+                                onSendMessage = { message ->
+                                     scope.launch { bluetoothManagerWrapper.sendMessage(message) }
+                                },
+                                onCheckPermissions = { checkPermissions() },
+                                bluetoothAdapter = adapter,
+                                messageLogs = messageLogs
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -110,119 +191,130 @@ fun GameScreen(
     onSendMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
     onCheckPermissions: () -> Unit,
-    bluetoothAdapter: BluetoothAdapter?
+    bluetoothAdapter: BluetoothAdapter?,
+    messageLogs: List<String>
 ) {
     var showDeviceList by remember { mutableStateOf(false) }
+    var showLogs by remember { mutableStateOf(false) }
+    
+    // Status Animations
+    val isConnected = connectionState is ConnectionState.Connected
+    val statusColor by animateColorAsState(
+        targetValue = if (isConnected) NeonCyan else Color.Gray,
+        label = "statusColor"
+    )
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // --- Header Section ---
+        // --- Header ---
         Spacer(modifier = Modifier.height(32.dp))
         Text(
             text = "RETRO DUCK HUNT",
-            fontSize = 30.sp, // Reduced from 36.sp to fit one line
-            fontWeight = FontWeight.Black,
-            color = MaterialTheme.colorScheme.primary,
-            letterSpacing = 1.sp, // Reduced spacing
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.fillMaxWidth() // Ensure it takes full width for centering
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Target Practice Simulator",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        // --- Connection Status Card ---
-        Card(
-            shape = MaterialTheme.shapes.medium,
-            colors = CardDefaults.cardColors(
-                containerColor = when(connectionState) {
-                    is ConnectionState.Connected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha=0.2f)
-                    is ConnectionState.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha=0.5f)
-                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f)
-                }
+            style = MaterialTheme.typography.displayMedium.copy(
+                shadow = androidx.compose.ui.graphics.Shadow(
+                    color = NeonMagenta,
+                    blurRadius = 30f,
+                    offset = androidx.compose.ui.geometry.Offset(0f, 0f)
+                )
             ),
-            modifier = Modifier.fillMaxWidth()
+            color = Color.White,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "ARCADE EDITION // v1.2",
+            style = MaterialTheme.typography.labelMedium,
+            color = NeonCyan.copy(alpha = 0.7f),
+            letterSpacing = 6.sp,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- connection Status ---
+        CyberpunkPanel(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    if (!isConnected) {
+                        onCheckPermissions()
+                        showDeviceList = true
+                    } else {
+                        onDisconnect()
+                    }
+                },
+            borderColor = statusColor,
+            backgroundColor = statusColor.copy(alpha = 0.05f)
         ) {
-            Row(
-                modifier = Modifier
-                    .padding(vertical = 16.dp, horizontal = 24.dp)
-                    .fillMaxWidth(),
+             Row(
+                modifier = Modifier.padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "STATUS",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = when (val state = connectionState) {
-                            is ConnectionState.Connected -> "Bluetooth connected"
-                            is ConnectionState.Connecting -> "Connecting..."
-                            is ConnectionState.Disconnected -> "Bluetooth disconnected"
-                            is ConnectionState.Error -> "Error: ${state.message}"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                
-                // Action Button next to status
-                if (connectionState is ConnectionState.Disconnected || connectionState is ConnectionState.Error) {
-                    Button(
-                        onClick = { 
-                            onCheckPermissions()
-                            showDeviceList = true 
-                        },
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Text("CONNECT")
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = { onDisconnect() },
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Text("DISCONNECT")
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // --- Game Dashboard ---
-        if (gameStatus != null || connectionState is ConnectionState.Connected) {
-             GameDashboard(gameStatus, onSendMessage)
-        } else {
-             Box(
-                 modifier = Modifier.fillMaxWidth().weight(1f),
-                 contentAlignment = Alignment.Center
+                horizontalArrangement = Arrangement.Center
              ) {
+                 Canvas(modifier = Modifier.size(10.dp)) {
+                     drawCircle(color = statusColor)
+                     drawCircle(color = statusColor.copy(alpha=0.5f), radius = 15f)
+                 }
+                 Spacer(modifier = Modifier.width(10.dp))
                  Text(
-                     text = "Connect to device to start",
-                     style = MaterialTheme.typography.bodyLarge,
-                     color = MaterialTheme.colorScheme.outline
+                    text = when (val state = connectionState) {
+                        is ConnectionState.Connected -> "SYSTEM ONLINE: ${state.deviceName.uppercase()}"
+                        is ConnectionState.Connecting -> "INITIATING LINK..."
+                        is ConnectionState.Disconnected -> "SYSTEM OFFLINE - TAP TO CONNECT"
+                        is ConnectionState.Error -> "SYSTEM ERROR: ${state.message.uppercase()}"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = statusColor
                  )
              }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- Main Game Monitor ---
+        Box(modifier = Modifier.weight(1f)) {
+             GameDashboard(gameStatus, onSendMessage)
+        }
+
+        // --- Footer / Logs ---
+        CyberpunkPanel(
+            modifier = Modifier.fillMaxWidth(),
+            borderColor = NeonCyan.copy(alpha = 0.3f),
+            backgroundColor = Color.Black.copy(alpha = 0.6f)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("DATA TERMINAL", color = NeonCyan.copy(alpha = 0.5f), fontSize = 10.sp)
+                    TextButton(onClick = { showLogs = true }, modifier = Modifier.height(24.dp)) {
+                         Text("EXPAND VIEW", color = NeonAmber, fontSize = 10.sp)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Text(
+                    text = if (messageLogs.isNotEmpty()) "> ${messageLogs.first()}" else "> NO DATA RECEIVED",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if(messageLogs.isNotEmpty()) NeonCyan else Color.Gray,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    maxLines = 1
+                )
+            }
+        }
         
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (showLogs) {
+             LogViewerDialog(logs = messageLogs, onDismiss = { showLogs = false })
+        }
+
         if (showDeviceList) {
             DeviceListDialog(
                 adapter = bluetoothAdapter,
@@ -240,91 +332,222 @@ fun GameScreen(
 fun GameDashboard(status: GameStatus?, onSendMessage: (String) -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth()
+        verticalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxSize() 
     ) {
-        // Score Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        
+        // --- SCOREBOARD ---
+        Box(contentAlignment = Alignment.Center) {
+             // Outer Glow
+             Canvas(modifier = Modifier.size(250.dp)) {
+                 drawCircle(
+                     brush = Brush.radialGradient(
+                         colors = listOf(NeonMagenta.copy(alpha=0.2f), Color.Transparent)
+                     )
+                 )
+             }
+             
+             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                 Text(
+                     text = "SCORE",
+                     style = MaterialTheme.typography.labelMedium,
+                     color = NeonMagenta
+                 )
+                 Text(
+                     text = String.format("%05d", status?.score ?: 0),
+                     style = MaterialTheme.typography.displayLarge.copy(
+                         fontSize = 72.sp,
+                         shadow = androidx.compose.ui.graphics.Shadow(
+                             color = NeonMagenta,
+                             blurRadius = 20f
+                         )
+                     ),
+                     color = Color.White
+                 )
+             }
+        }
+        
+        // --- TIME BAR ---
+        val maxTime = 60f // Assuming 60s max for visual proportion
+        val currentTime = (status?.time ?: 0).toFloat()
+        val timeProgress = (currentTime / maxTime).coerceIn(0f, 1f)
+        val isLowTime = currentTime <= 5 && currentTime > 0
+        
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.padding(32.dp).fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
             ) {
-                Text(
-                    text = "CURRENT SCORE",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.secondary,
-                    letterSpacing = 1.sp,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "${status?.score ?: 0}",
-                    fontSize = 96.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary, // Retro Green?
-                    lineHeight = 96.sp,
-                    textAlign = TextAlign.Center
+                 Text("TIME REMAINING", color = NeonCyan, fontSize = 12.sp)
+                 Text(
+                     "${status?.time ?: 0}s", 
+                     color = if(isLowTime) Color.Red else NeonCyan, 
+                     fontSize = 24.sp,
+                     fontWeight = FontWeight.Bold
+                 )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            // Custom Progress Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+                    .background(Color(0xFF111122), RoundedCornerShape(4.dp))
+                    .border(1.dp, NeonCyan.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(timeProgress)
+                        .fillMaxHeight()
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = if(isLowTime) listOf(Color.Red, Color(0xFFFF5555)) 
+                                         else listOf(NeonCyan, Color(0xFF55FFFF))
+                            ),
+                            shape = RoundedCornerShape(4.dp)
+                        )
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Time Card (Smaller)
-        Card(
-            modifier = Modifier.fillMaxWidth(0.6f),
-             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                val remainingTime = status?.time ?: 0
-                val timerColor = if (remainingTime <= 5) {
-                    MaterialTheme.colorScheme.error // Red color for warning
-                } else {
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                }
-
-                Text(
-                    text = "TIME REMAINING",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = timerColor,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "${remainingTime}s",
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = timerColor,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Control Buttons
+        // --- CONTROLS ---
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Button(
-                onClick = { onSendMessage("CMD,START\n") },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text("START GAME")
-            }
-            
-            Button(
-                onClick = { onSendMessage("CMD,RESET\n") },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) {
-                Text("RESET GAME")
-            }
+            ArcadeButton(
+                text = "START",
+                color = NeonCyan,
+                onClick = { onSendMessage("CMD,START\n") }
+            )
+            ArcadeButton(
+                text = "RESET",
+                color = NeonAmber,
+                onClick = { onSendMessage("CMD,RESET\n") }
+            )
         }
+    }
+}
+
+@Composable
+fun CyberpunkPanel(
+    modifier: Modifier = Modifier,
+    borderColor: Color = NeonCyan,
+    backgroundColor: Color = Color(0xFF000000),
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .border(
+                BorderStroke(1.dp, borderColor.copy(alpha = 0.6f)),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(1.dp) // Inner padding
+    ) {
+        // Corner Accents
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val length = 10.dp.toPx()
+            val stroke = 2.dp.toPx()
+            val color = borderColor
+            
+            // Top Left
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(length, 0f), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(0f, length), stroke)
+            
+            // Top Right
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, 0f), androidx.compose.ui.geometry.Offset(size.width - length, 0f), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, 0f), androidx.compose.ui.geometry.Offset(size.width, length), stroke)
+            
+            // Bottom Left
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(length, size.height), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(0f, size.height - length), stroke)
+            
+             // Bottom Right
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, size.height), androidx.compose.ui.geometry.Offset(size.width - length, size.height), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height - length), stroke)
+        }
+        content()
+    }
+}
+
+@Composable
+fun ArcadeButton(
+    text: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    
+    Box(
+        modifier = Modifier
+            .size(110.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { 
+                 isPressed = true
+                 onClick()
+                 // Reset pressed state after a quick delay for visual feedback handling is complex in compose without coroutine but visual tap is better handled by interaction source usually. 
+                 // For now, let's just rely on the ripple or scale. 
+                 // Better implementation:
+            }
+            // Simple press effect manually
+            .graphicsLayer {
+                val scale = if (isPressed) 0.95f else 1f
+                scaleX = scale
+                scaleY = scale
+            }
+    ) {
+         // Button Release logic
+         LaunchedEffect(isPressed) {
+             if(isPressed) {
+                 kotlinx.coroutines.delay(100)
+                 isPressed = false
+             }
+         }
+    
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = center
+            val radius = size.minDimension / 2
+            
+            // Outer Ring
+            drawCircle(
+                color = color.copy(alpha = 0.3f),
+                radius = radius,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx())
+            )
+            
+            // Inner Fill (Glassy)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(color.copy(alpha = 0.1f), color.copy(alpha = 0.6f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius - 8.dp.toPx()
+            )
+            
+            // Border
+            drawCircle(
+                color = color,
+                radius = radius - 8.dp.toPx(),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+            )
+        }
+        
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleLarge,
+            color = Color.White,
+            modifier = Modifier.align(Alignment.Center)
+        )
     }
 }
 
@@ -338,10 +561,12 @@ fun DeviceListDialog(
     if (adapter == null || !adapter.isEnabled) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
-            title = { Text("Bluetooth Unavailable") },
-            text = { Text("Please enable Bluetooth on your device.") },
-            icon = { Text("⚠️") } // Simple text icon if vector not available
+            confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color=NeonCyan) } },
+            containerColor = Color(0xFF1E1E2C),
+            titleContentColor = NeonCyan,
+            textContentColor = Color.White,
+            title = { Text("BLUETOOTH ERROR") },
+            text = { Text("Bluetooth is not enabled.") }
         )
         return
     }
@@ -354,67 +579,80 @@ fun DeviceListDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E1E2C), // Deep Surface
+        titleContentColor = NeonCyan,
+        textContentColor = Color.White,
         confirmButton = {
-             TextButton(onClick = onDismiss) { Text("Cancel") }
+             TextButton(onClick = onDismiss) { Text("CANCEL", color = NeonMagenta) }
         },
-        title = { Text("Select Device", fontWeight = FontWeight.Bold) },
+        title = { Text("SELECT DEVICE", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                 items(pairedDevices) { device ->
+                     CyberpunkPanel(
+                         modifier = Modifier.fillMaxWidth().clickable { onDeviceSelected(device) },
+                         borderColor = NeonCyan.copy(alpha=0.5f),
+                         backgroundColor = Color.Transparent
+                     ) {
+                         Column(modifier = Modifier.padding(16.dp)) {
+                             Text(device.name ?: "Unknown", color = NeonCyan, fontWeight = FontWeight.Bold)
+                             Text(device.address, color = Color.Gray, fontSize = 12.sp)
+                         }
+                     }
+                 }
+            }
+        }
+    )
+}
+
+@Composable
+fun LogViewerDialog(
+    logs: List<String>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("CLOSE", color = NeonCyan) }
+        },
+        containerColor = Color(0xFF000000),
+        titleContentColor = NeonCyan,
+        textContentColor = NeonCyan,
+        title = { Text("SYSTEM LOGS") },
         text = {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.heightIn(max = 300.dp)
+                modifier = Modifier.heightIn(max = 400.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (pairedDevices.isEmpty()) {
-                    item { 
-                        Text(
-                            "No paired devices found.\nPlease pair your HC-06 module in Android Settings first.",
-                            modifier = Modifier.padding(8.dp)
-                        ) 
-                    }
-                } else {
-                    items(pairedDevices) { device ->
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onDeviceSelected(device) }
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = device.name ?: "Unknown Device",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = device.address,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
+                items(logs) { log ->
+                    Text(
+                        text = log,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        color = NeonCyan
+                    )
+                    Divider(color = NeonCyan.copy(alpha=0.2f))
                 }
             }
         }
     )
 }
 
-// Helper annotation for simplified permission handling in this view logic
-@SuppressLint("MissingPermission")
-private fun getPairedDevices(adapter: BluetoothAdapter): List<android.bluetooth.BluetoothDevice> {
-    return adapter.bondedDevices.toList()
-}
-
 @Preview(showBackground = true)
 @Composable
 fun GameScreenPreview() {
     Esdl_term_projectTheme {
-        GameScreen(
-            connectionState = ConnectionState.Connected("STM32-Game"),
-            gameStatus = GameStatus(score = 1500, time = 45), // Set to 5 to trigger red warning
-            onConnect = {},
-            onDisconnect = {},
-            onSendMessage = {},
-            onCheckPermissions = {},
-            bluetoothAdapter = null
-        )
+        Box(modifier = Modifier.background(Color.Black)) {
+            GameScreen(
+                connectionState = ConnectionState.Connected("STM32-Game"),
+                gameStatus = GameStatus(score = 8500, time = 30),
+                onConnect = {},
+                onDisconnect = {},
+                onSendMessage = {},
+                onCheckPermissions = {},
+                bluetoothAdapter = null,
+                messageLogs = listOf("[RX] STATUS,score=100,time=5")
+            )
+        }
     }
 }

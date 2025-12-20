@@ -26,6 +26,9 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
     private val _gameStatus = MutableStateFlow<GameStatus?>(null)
     val gameStatus: StateFlow<GameStatus?> = _gameStatus
 
+    private val _messageLog = MutableStateFlow<List<String>>(emptyList())
+    val messageLog: StateFlow<List<String>> = _messageLog
+
     suspend fun sendMessage(message: String) {
         if (!isRunning || socket?.isConnected != true) return
         
@@ -75,6 +78,12 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
                         while (newlineIndex != -1) {
                             val line = messageBuffer.substring(0, newlineIndex).trim()
                             if (line.isNotEmpty()) {
+                                // Add to log (keep last 50)
+                                val currentLog = _messageLog.value.toMutableList()
+                                currentLog.add(0, "[RX] $line")
+                                if (currentLog.size > 50) currentLog.removeAt(currentLog.lastIndex)
+                                _messageLog.value = currentLog
+
                                 handleIncomingMessage(line)
                             }
                             messageBuffer.delete(0, newlineIndex + 1)
