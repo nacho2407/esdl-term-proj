@@ -46,7 +46,7 @@ void Game_Loop(void)
         // 120ms ���� -> ��� ����
         // char buf[32];
         // snprintf(buf, sizeof(buf), "PEAK=%lu\r\n", current_peak);
-        char *msg = Protocol_BuildTriggerMessage(seq, current_peak);
+        char *msg = Protocol_BuildAmbientMessage(seq, current_peak);
         USART1_SendString(msg);
         // ���� ����
         is_capturing = 0;

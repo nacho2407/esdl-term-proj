@@ -2,9 +2,10 @@
 #define __GAME_H
 
 #include <stdint.h>
+#include "protocol.h"
 
 void Game_Init(void);
-void Game_Loop(void);          // main.c¿¡¼­ »ç¿ë
-uint32_t Game_GetRecentPeak(void); // trigger.c¿¡¼­ »ç¿ë
+void Game_Loop(void);              // main.cï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+uint32_t Game_GetRecentPeak(void); // trigger.cï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 
 #endif

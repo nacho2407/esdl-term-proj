@@ -15,7 +15,7 @@ char *Protocol_BuildTriggerMessage(uint32_t seq, uint32_t ambient)
     return buffer;
 }
 
-char *Protocol_BuildAmbientMessage(uint32_t seq, u_int32_t ambient)
+char *Protocol_BuildAmbientMessage(uint32_t seq, uint32_t ambient)
 {
     static char buffer[64];
 
