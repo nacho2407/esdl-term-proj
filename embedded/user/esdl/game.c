@@ -1,15 +1,13 @@
 #include "game.h"
 #include "sensor.h"
 #include "time.h"
-#include "uart.h"  
-#include <stdio.h>  
+#include "uart.h"
+#include <stdio.h>
 
-
-static int is_capturing = 0;       // ÇöÀç ÃøÁ¤ ÁßÀÎÁö È®ÀÎÇÏ´Â ÇÃ·¡±×
-static uint32_t capture_start_time = 0; // ÃøÁ¤ ½ÃÀÛ ½Ã°£
-static uint32_t current_peak = 0;  // ÃøÁ¤ ±¸°£ ³» ÃÖ´ë°ª ÀúÀå
-
-
+static int is_capturing = 0;            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½
+static uint32_t capture_start_time = 0; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½
+static uint32_t current_peak = 0;       // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ö´ë°ª ï¿½ï¿½ï¿½ï¿½
+extern volatile uint32_t seq;
 
 void Game_Init(void)
 {
@@ -17,40 +15,40 @@ void Game_Init(void)
     current_peak = 0;
 }
 
-// Trigger.c ¿¡¼­ È£Ãâ
+// Trigger.c ï¿½ï¿½ï¿½ï¿½ È£ï¿½ï¿½
 void Game_StartCapture(void)
 {
     is_capturing = 1;
     capture_start_time = millis();
-    current_peak = 0; // ÇÇÅ©°ª ÃÊ±âÈ­
+    current_peak = 0; // ï¿½ï¿½Å©ï¿½ï¿½ ï¿½Ê±ï¿½È­
 }
 
 void Game_Loop(void)
 {
-    // ÃøÁ¤ ¸ðµå°¡ ¾Æ´Ï¸é ¾Æ¹«°Íµµ ¾È ÇÔ
-    if (is_capturing == 0) return;
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½å°¡ ï¿½Æ´Ï¸ï¿½ ï¿½Æ¹ï¿½ï¿½Íµï¿½ ï¿½ï¿½ ï¿½ï¿½
+    if (is_capturing == 0)
+        return;
 
-    // 1. ÇöÀç ¼¾¼­°ª ÀÐ±â (sensor.cÀÇ ÃÖ½Å°ª)
+    // 1. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ð±ï¿½ (sensor.cï¿½ï¿½ ï¿½Ö½Å°ï¿½)
     uint16_t currentIdx = ADC_GetWriteIndex();
     uint16_t dataIdx = (currentIdx == 0) ? (ADC_BUF_LEN - 1) : (currentIdx - 1);
     uint16_t sensorVal = adc_buf[dataIdx];
 
-    // 2. ÃÖ´ë°ª °»½Å (Peak Hold)
+    // 2. ï¿½Ö´ë°ª ï¿½ï¿½ï¿½ï¿½ (Peak Hold)
     if (sensorVal > current_peak)
     {
         current_peak = sensorVal;
     }
 
-    // 3. ½Ã°£ Ã¼Å© (120ms Áö³µ´ÂÁö?)
+    // 3. ï¿½Ã°ï¿½ Ã¼Å© (120ms ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?)
     if (millis() - capture_start_time >= 120)
     {
-        // 120ms Áö³² -> °á°ú Àü¼Û
-        char buf[32];
-        snprintf(buf, sizeof(buf), "PEAK=%lu\r\n", current_peak);
-        USART1_SendString(buf);
-
-        // ÃøÁ¤ Á¾·á
+        // 120ms ï¿½ï¿½ï¿½ï¿½ -> ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+        // char buf[32];
+        // snprintf(buf, sizeof(buf), "PEAK=%lu\r\n", current_peak);
+        char *msg = Protocol_BuildTriggerMessage(seq, current_peak);
+        USART1_SendString(msg);
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         is_capturing = 0;
     }
 }
-

@@ -135,9 +135,6 @@ void USART2_IRQHandler(void)
     {
         uint8_t byte = (uint8_t)USART_ReceiveData(USART2);
         USART_SendByte_NoWaitTC(USART1, byte); // Bluetooth -> PC 포워딩
-
-        // TODO Start, Reset 기능 구현
-
         // USART_ReceiveData(USART2); // 읽어서 플래그만 클리어
     }
 }

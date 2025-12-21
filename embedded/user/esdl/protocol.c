@@ -14,3 +14,15 @@ char *Protocol_BuildTriggerMessage(uint32_t seq, uint32_t ambient)
 
     return buffer;
 }
+
+char *Protocol_BuildAmbientMessage(uint32_t seq, u_int32_t ambient)
+{
+    static char buffer[64];
+
+    // 메시지 타입, seq, ambient, distance
+    snprintf(buffer, sizeof(buffer),
+             "TYPE=%u;SEQ=%lu;AMB=%lu\r\n",
+             TYPE_PEAK, seq, ambient);
+
+    return buffer;
+}
