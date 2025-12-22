@@ -26,7 +26,7 @@ void USART1_Init(void)
 
     // USART 설정
     USART_InitTypeDef usart;
-    usart.USART_BaudRate = 9600;
+    usart.USART_BaudRate = 115200;
     usart.USART_WordLength = USART_WordLength_8b;
     usart.USART_StopBits = USART_StopBits_1;
     usart.USART_Parity = USART_Parity_No;
@@ -63,7 +63,7 @@ void USART2_init(void)
     GPIO_PinRemapConfig(GPIO_Remap_USART2, ENABLE);
 
     USART_InitTypeDef usart;
-    usart.USART_BaudRate = 9600;
+    usart.USART_BaudRate = 115200;
     usart.USART_WordLength = USART_WordLength_8b;
     usart.USART_StopBits = USART_StopBits_1;
     usart.USART_Parity = USART_Parity_No;
