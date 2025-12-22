@@ -43,21 +43,21 @@ void USART1_Init(void)
 
 void USART2_init(void)
 {
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 
     GPIO_InitTypeDef gpio;
 
-    // PA2 - USART2 TX
-    gpio.GPIO_Pin = GPIO_Pin_2;
+    // PA5 - USART2 TX
+    gpio.GPIO_Pin = GPIO_Pin_5;
     gpio.GPIO_Mode = GPIO_Mode_AF_PP;
     gpio.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &gpio);
+    GPIO_Init(GPIOD, &gpio);
 
-    // PA3 - USART2 RX
-    gpio.GPIO_Pin = GPIO_Pin_3;
+    // PA6 - USART2 RX
+    gpio.GPIO_Pin = GPIO_Pin_6;
     gpio.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_Init(GPIOA, &gpio);
+    GPIO_Init(GPIOD, &gpio);
 
     // USART2 리맵
     GPIO_PinRemapConfig(GPIO_Remap_USART2, ENABLE);
